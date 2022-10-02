@@ -6,7 +6,7 @@ loc_est_path <- "data_derived/localization_validation_estimates.rds"
 # Load some functions for retrieving 
 source("code/functions/get_calibrations.R")
 
-if (!update_node_cal) {
+if (!new_beep_data) {
   loc_val_data <- readRDS(loc_val_path)
 } else {
   loc_val_meta <- get_localization_validation()
@@ -42,10 +42,9 @@ if (!update_node_cal) {
   saveRDS(loc_val_data, loc_val_path)
 }
 
-if (!update_node_cal) {
+if (!new_beep_data) {
   out_loc_ests <- readRDS(loc_est_path)
 } else {
-  
   naive_ests <- bind_rows(
     # Full grid
     loc_val_data %>% group_by(Val_pt) %>% slice(which.max(adjTagRSSI_mn)) %>%
@@ -138,8 +137,6 @@ all_converged_ests <- filter(out_loc_ests, converged)
   group_by(grid_config) %>%
   summarize(med_xy_dist = median(xy_dist, na.rm = TRUE),
             med_xy_dist_naive = median(xy_dist_naive)))
-# full_grid_ests <- filter(all_converged_ests, converged, grid_config == "full")
-# reduced_grid_ests <- filter(all_converged_ests, converged, grid_config == "reduced")
 
 # Histograms of absolute error for estimated location of validation points (w/median absolute error)
 ggplot(all_converged_ests, aes(x = xy_dist)) +
@@ -150,7 +147,7 @@ ggplot(all_converged_ests, aes(x = xy_dist)) +
             x = 100, y = 4, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
   theme_bw()
-ggsave("output/figures/absolute_estimation_error_by_grid_configuration.png", width = 6.5, height = 6.5)
+ggsave("output/figures/absolute_estimation_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Histograms of absolute error for naive location (i.e., location of node w/strongest RSSI) of validation points (w/median absolute error)
 ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
@@ -161,7 +158,7 @@ ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
             x = 100, y = 5, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
   theme_bw()
-ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 6.5, height = 6.5)
+ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
 ggplot(all_converged_ests, aes(x = n_nodes, y = xy_dist)) +
