@@ -2,6 +2,12 @@
 .Rhistory
 .Rapp.history
 
+# Specific locations
+data_raw/GA Black Rail/
+data_raw/CTT_powertag_test.xlsx
+data_raw/caught.RData
+output/TagRSSI_distance_CV.rds
+
 # Session Data files
 .RData
 
