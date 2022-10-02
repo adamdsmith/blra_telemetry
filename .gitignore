@@ -14,15 +14,6 @@ output/TagRSSI_distance_CV.rds
 # User-specific files
 .Ruserdata
 
-# Example code in package build process
-*-Ex.R
-
-# Output files from R CMD build
-/*.tar.gz
-
-# Output files from R CMD check
-/*.Rcheck/
-
 # RStudio files
 .Rproj.user/
 
