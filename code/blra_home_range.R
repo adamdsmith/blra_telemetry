@@ -1,8 +1,8 @@
 # Home range estimation via the amt package, though it uses ctmm for aKDE estimation
-pacman::p_load(amt, tidyverse, sf, lubridate)
+pacman::p_load(amt, tidyr, sf)
 blra_id <- "78076161"
 blra_full <- read_rds("data_derived/localized_beep_data.rds")[[blra_id]] %>% 
-  # Use data from APril with complete node grid
+  # Use data from April with complete node grid
   filter(DetTimeR >= ymd_hms("2022-04-01 00:00:00"),
          DetTimeR < ymd_hms("2022-05-01 00:00:00"),
          converged, # Only use estimated locations that produced a solution
@@ -12,7 +12,7 @@ blra_full <- read_rds("data_derived/localized_beep_data.rds")[[blra_id]] %>%
   # Nest so we can get different HR estimates in tidy format
   nest(data = c(x_, y_, t_))
 blra_red <- read_rds("data_derived/blra_locs_reduced.rds")[[blra_id]] %>% 
-  # Use data from APril with complete node grid
+  # Use data from April with complete node grid
   filter(DetTimeR >= ymd_hms("2022-04-01 00:00:00"),
          DetTimeR < ymd_hms("2022-05-01 00:00:00"),
          converged,
@@ -22,34 +22,40 @@ blra_red <- read_rds("data_derived/blra_locs_reduced.rds")[[blra_id]] %>%
   # Nest so we can get different HR estimates in tidy format
   nest(data = c(x_, y_, t_))
 
-# Takes a bit, even for half-hourly points (about 8 minutes per scenario---full grid, reduced grid)
-system.time({
-  blra_hr_full <- blra_full %>%
-    mutate(
-      hr_mcp = map(data, hr_mcp, levels = c(0.5, 0.95)),
-      hr_kde = map(data, hr_kde, levels = c(0.5, 0.95)),
-      hr_akde = map(data, ~ hr_akde(., fit_ctmm(., "auto"), levels = c(0.5, 0.95)))
-    )
-})
-blra_hr_full <- blra_hr_full %>%
-  select(-data) %>% 
-  pivot_longer(hr_mcp:hr_akde, names_to = "estimator", 
-               values_to = "hr")
-saveRDS(blra_hr_full, "data_derived/blra_hr_full_estimates.rds")
-
-system.time({
-  blra_hr_red <- blra_red %>%
-    mutate(
-      hr_mcp = map(data, hr_mcp, levels = c(0.5, 0.95)),
-      hr_kde = map(data, hr_kde, levels = c(0.5, 0.95)),
-      hr_akde = map(data, ~ hr_akde(., fit_ctmm(., "auto"), levels = c(0.5, 0.95)))
-    )
-})
-blra_hr_red <- blra_hr_red %>%
-  select(-data) %>% 
-  pivot_longer(hr_mcp:hr_akde, names_to = "estimator", 
-               values_to = "hr")
-saveRDS(blra_hr_red, "data_derived/blra_hr_reduced_estimates.rds")
+recalc_hrs <- FALSE
+if (recalc_hrs) {
+  # Takes a bit, even for half-hourly points (about 8 minutes per scenario---full grid, reduced grid)
+  system.time({
+    blra_hr_full <- blra_full %>%
+      mutate(
+        hr_mcp = map(data, hr_mcp, levels = c(0.5, 0.95)),
+        hr_kde = map(data, hr_kde, levels = c(0.5, 0.95)),
+        hr_akde = map(data, ~ hr_akde(., fit_ctmm(., "auto"), levels = c(0.5, 0.95)))
+      )
+  })
+  blra_hr_full <- blra_hr_full %>%
+    select(-data) %>% 
+    pivot_longer(hr_mcp:hr_akde, names_to = "estimator", 
+                 values_to = "hr")
+  saveRDS(blra_hr_full, "data_derived/blra_hr_full_estimates.rds")
+  
+  system.time({
+    blra_hr_red <- blra_red %>%
+      mutate(
+        hr_mcp = map(data, hr_mcp, levels = c(0.5, 0.95)),
+        hr_kde = map(data, hr_kde, levels = c(0.5, 0.95)),
+        hr_akde = map(data, ~ hr_akde(., fit_ctmm(., "auto"), levels = c(0.5, 0.95)))
+      )
+  })
+  blra_hr_red <- blra_hr_red %>%
+    select(-data) %>% 
+    pivot_longer(hr_mcp:hr_akde, names_to = "estimator", 
+                 values_to = "hr")
+  saveRDS(blra_hr_red, "data_derived/blra_hr_reduced_estimates.rds")
+} else {
+  blra_hr_full <- readRDS("data_derived/blra_hr_full_estimates.rds")
+  blra_hr_red <- readRDS("data_derived/blra_hr_reduced_estimates.rds")
+}
 
 # With home ranges estimated, here are some example functionality that may be of use
 # Both `blra_hr_full` and `blra_hr_red` have a column "hr" that contains the home range estimations
