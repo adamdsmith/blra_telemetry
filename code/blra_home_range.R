@@ -2,22 +2,22 @@
 pacman::p_load(amt, tidyr, sf)
 blra_id <- "78076161"
 blra_full <- read_rds("data_derived/localized_beep_data.rds")[[blra_id]] %>% 
-  # Use data from April with complete node grid
-  filter(DetTimeR >= ymd_hms("2022-04-01 00:00:00"),
-         DetTimeR < ymd_hms("2022-05-01 00:00:00"),
+  # Use data from end of March into April with complete node grid while bird was alive
+  filter(DetTimeR >= ymd_hms("2022-03-31 00:00:00"),
+         DetTimeR < ymd_hms("2022-04-14 00:00:00"),
          converged, # Only use estimated locations that produced a solution
          # Use only observations every half hour to reduce data set size for example
-         minute(DetTimeR) %in% c(0, 30)) %>%
+         minute(DetTimeR) %in% c(0, 15, 30, 45)) %>%
   make_track(X_est, Y_est, DetTimeR, id = TagId, crs = 32617) %>%
   # Nest so we can get different HR estimates in tidy format
   nest(data = c(x_, y_, t_))
 blra_red <- read_rds("data_derived/blra_locs_reduced.rds")[[blra_id]] %>% 
-  # Use data from April with complete node grid
-  filter(DetTimeR >= ymd_hms("2022-04-01 00:00:00"),
-         DetTimeR < ymd_hms("2022-05-01 00:00:00"),
+  # Use data from end of March into April with complete node grid while bird was alive
+  filter(DetTimeR >= ymd_hms("2022-03-31 00:00:00"),
+         DetTimeR < ymd_hms("2022-04-14 00:00:00"),
          converged,
          # Use only observations every quarter hour to reduce data set size for example
-         minute(DetTimeR) %in% c(0, 30)) %>%
+         minute(DetTimeR) %in% c(0, 15, 30, 45)) %>%
   make_track(X_est, Y_est, DetTimeR, id = TagId, crs = 32617) %>%
   # Nest so we can get different HR estimates in tidy format
   nest(data = c(x_, y_, t_))
@@ -78,3 +78,4 @@ hr_area(blra_hr_red$hr[[3]]) # aKDE, reduced grid
 
 # Home range overlap
 hr_overlap(blra_hr_full$hr[[3]], blra_hr_red$hr[[3]]) #aKDE, full vs. reduced grid overlap
+
