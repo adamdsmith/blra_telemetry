@@ -1,9 +1,9 @@
 ##################################################
 # LOAD REQUIRED PACKAGES 
 ##################################################
-if (!requireNamespace("pacman", quietly = TRUE)) 
-  install.packages("pacman", quiet = TRUE)
-pacman::p_load(pbapply, DBI, RPostgres, dplyr, lubridate, 
+if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", quiet = TRUE)
+if (!requireNamespace("nrsmisc", quietly = TRUE)) remotes::install_github("adamdsmith/nrsmisc")
+pacman::p_load(pbapply, DBI, RPostgres, dplyr, lubridate, nrsmisc,
                ggplot2, mgcv, lme4, geosphere, parallel, googledrive)
 
 ##################################################
