@@ -1,4 +1,5 @@
 # NOTE: Requires `code/localization_workflow` to have been run first 
+source("code/localization_workflow.R")
 
 loc_val_path <- "data_derived/localization_validation.rds"
 loc_est_path <- "data_derived/localization_validation_estimates.rds"
@@ -11,8 +12,7 @@ if (!new_beep_data) {
 } else {
   loc_val_meta <- get_localization_validation()
   loc_val_nodes <- get_localization_validation_nodes()
-  
-  # Join beep data with validation metadata
+   # Join beep data with validation metadata
   loc_val_data <- beep_data %>%
     filter(between(Time, min(loc_val_meta$ValStartDT), max(loc_val_meta$ValEndDT))) %>%
     # Get rid of duplicate detections on multiple SS radios
@@ -54,14 +54,15 @@ if (!new_beep_data) {
       select(Val_pt, X_naive = X, Y_naive = Y) %>% ungroup() %>%
       mutate(grid_config = "reduced"))
 
-  # Base list of all validation points with naive estimated locations
-  all_val_pts <- loc_val_data %>%
-    select(TagId, Val_pt, Val_X, Val_Y) %>% distinct() %>%
-    left_join(naive_ests, by = "Val_pt")
-  
   # Center X and Y to ease computation
   x_mn <- mean(loc_val_nodes$X)
   y_mn <- mean(loc_val_nodes$Y)
+  
+  # Base list of all validation points with naive estimated locations
+  all_val_pts <- loc_val_data %>%
+    mutate(dist_grid_center = sqrt((Val_X - x_mn)^2 + (Val_Y - y_mn)^2)) %>%
+    select(TagId, Val_pt, Val_X, Val_Y, Val_dist_to_center = dist_grid_center) %>% distinct() %>%
+    left_join(naive_ests, by = "Val_pt")
   
   # Specify some minimum detecting node requirements to use localization estimate
   # Note these needn't apply to naive estimates; by def, just need one node detection to estimate location
@@ -146,6 +147,7 @@ ggplot(all_converged_ests, aes(x = xy_dist)) +
   geom_text(data = est_medians, aes(label = paste("Median:", round(med_xy_dist, 1), "m")), 
             x = 100, y = 4, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
+  ggtitle("Multilateration error of validation locations") +
   theme_bw()
 ggsave("output/figures/absolute_estimation_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
@@ -157,16 +159,39 @@ ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
   geom_text(data = est_medians, aes(label = paste("Median:", round(med_xy_dist_naive, 1), "m")), 
             x = 100, y = 5, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
+  ggtitle("Naive error of validation locations") +
   theme_bw()
 ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
-ggplot(all_converged_ests, aes(x = n_nodes, y = xy_dist)) +
-  # geom_smooth(method = "lm") + 
-  geom_point(aes(color = within_grid)) + 
-  labs(x = "# detecting nodes", y = "Absolute error (m)", color = "Point\nin grid") + 
-  facet_wrap(~ grid_config) + theme_bw()
+ggplot(all_converged_ests, aes(x = n_nodes, y = log(xy_dist))) +
+  geom_smooth(method = "lm") + 
+  geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
+  labs(x = "# detecting nodes", y = "log (absolute error) (m)", fill = "Within grid") + 
+  facet_wrap(~ grid_config) + 
+  ggtitle("Multilateration error vs. number of estimating nodes") +
+  theme_bw()
 ggsave("output/figures/absolute_estimation_error_by_number_detecting_nodes.png", width = 6.5, height = 4.5)
+
+# Relationship between distance from node grid center and absolute error of that estimate (localization)
+ggplot(all_converged_ests, aes(x = Val_dist_to_center, y = log(xy_dist))) +
+  geom_smooth(method = "lm") + 
+  geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
+  labs(x = "Distance to node grid center (m)", y = "log (Absolute error) (m)", color = "Point\nin grid") + 
+  facet_wrap(~ grid_config, ncol = 2) + 
+  ggtitle("Multilateration error vs. distance from center of node grid") +
+  theme_bw()
+ggsave("output/figures/multilateration_estimation_error_by_distance_to_grid_center.png", width = 6.5, height = 4.5)
+
+# Relationship between distance from node grid center and absolute error of that estimate (naive)
+ggplot(out_loc_ests, aes(x = Val_dist_to_center, y = log(xy_dist_naive))) +
+  geom_smooth(method = "lm") + 
+  geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
+  labs(x = "Distance to node grid center (m)", y = "log (absolute error) (m)", color = "Point\nin grid") + 
+  facet_wrap(~ grid_config, ncol = 2) + 
+  ggtitle("Naive error vs. distance from center of node grid") +
+  theme_bw()
+ggsave("output/figures/naive_estimation_error_by_distance_to_grid_center.png", width = 6.5, height = 4.5)
 
 # Estimated absolute errors plotted by location within node grid
 ## Need to first expand node location data.frame for use in faceted plot
