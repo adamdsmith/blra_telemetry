@@ -160,7 +160,7 @@ akde_hr_ests <- rbind(akde_loc_full, akde_naive_full, akde_loc_red, akde_naive_r
 p <- ggplot(akde_hr_ests) + geom_sf(aes(fill = factor(level, levels = c(0.5, 0.95), labels = c("50%", "95%")))) + 
   geom_sf(data = hr_pts, size = 0.5, alpha = 0.5) +
   scale_fill_manual("aKDE level", values = c("gray", NA), na.value = NA) +
-  facet_wrap(~model, nrow = 2) + theme_bw() +
+  facet_wrap(~model, nrow = 2) + theme_bw() + labs(x = NULL, y = NULL) +
   theme(axis.text = element_blank(),
         axis.ticks = element_blank())
 # Get X and Y limits for labelling
