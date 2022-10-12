@@ -3,6 +3,10 @@ multilaterate_beep_dat <- function(beep_dat, Tags = NULL, min_node_beeps = 4, mi
   all_tag_loc_ests <- lapply(Tags, function(Tag) {
     tmp_beep <- filter(beep_dat, TagId == Tag, n >= min_node_beeps)
     
+    # Retrieve naive locations (location of node w/strongest average signal)
+    naive_ests <- tmp_beep %>% group_by(TagId, DetTimeR) %>% slice(which.max(adjTagRSSI_mn)) %>%
+        select(TagId, DetTimeR, X_naive = X, Y_naive = Y, Node_naive = NodeId) %>% ungroup()
+
     # Center X and Y to ease computation
     x_mn <- mean(tmp_beep$X)
     y_mn <- mean(tmp_beep$Y)
@@ -54,6 +58,7 @@ multilaterate_beep_dat <- function(beep_dat, Tags = NULL, min_node_beeps = 4, mi
     out_loc_ests <- tmp_beep %>% group_by(loc_grp, .add = TRUE) %>%
       summarize(.groups = "drop") %>%
       left_join(loc_ests, by = "loc_grp") %>%
+      left_join(naive_ests, by = c("TagId", "DetTimeR")) %>%
       arrange(DetTimeR)
     out_loc_ests
   })
