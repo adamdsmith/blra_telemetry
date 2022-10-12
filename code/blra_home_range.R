@@ -139,6 +139,7 @@ akde_areas <- bind_rows(akde_loc_full_area,
                         akde_naive_red_area) %>%
   filter(what == "estimate") %>%
   mutate(area_ha = round(area / 10000, 2))
+
 # Home range overlap
 hr_overlap(blra_hr_loc_full$hr[[3]], blra_hr_loc_red$hr[[3]]) #aKDE, full vs. reduced grid overlap
 hr_overlap(blra_hr_loc_full$hr[[3]], blra_hr_naive_full$hr[[3]]) #aKDE, full vs. reduced grid overlap
@@ -154,6 +155,8 @@ hr_pts <- rbind(mutate(blra_full_loc_sf, model = "Localization\n(full grid)"),
                 mutate(blra_red_naive_sf, model = "Naive\n(reduced grid)"))
 akde_hr_ests <- rbind(akde_loc_full, akde_naive_full, akde_loc_red, akde_naive_red) %>%
   filter(what == "estimate") 
+
+# Plot aKDE home range comparison, with 50% and 95% estimated areas
 p <- ggplot(akde_hr_ests) + geom_sf(aes(fill = factor(level, levels = c(0.5, 0.95), labels = c("50%", "95%")))) + 
   geom_sf(data = hr_pts, size = 0.5, alpha = 0.5) +
   scale_fill_manual("aKDE level", values = c("gray", NA), na.value = NA) +
@@ -168,5 +171,5 @@ akde_areas <- akde_areas %>%
          y = max(yr) - 0.025 * ifelse(level == 0.5, 1, 5) * diff(yr),
          label = paste(paste0(level *100, "%:"), area_ha, "ha"))
 p + geom_text(data = akde_areas, aes(x, y, label = label),
-              xjust = 0, yjust = 1, size = 2)
+              hjust = 0, vjust = 1, size = 3)
 ggsave("output/figures/akde_hr_comparisons.png", height = 6.5, width = 6.5)
