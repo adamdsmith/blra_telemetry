@@ -1,17 +1,18 @@
 # NOTE: Requires `code/localization_workflow` to have been run first 
 source("code/localization_workflow.R")
+pacman::p_load(glmmTMB, DHARMa)
 
 loc_val_path <- "data_derived/localization_validation.rds"
 loc_est_path <- "data_derived/localization_validation_estimates.rds"
 
 # Load some functions for retrieving 
 source("code/functions/get_calibrations.R")
+loc_val_nodes <- get_localization_validation_nodes()
 
 if (!new_beep_data) {
   loc_val_data <- readRDS(loc_val_path)
 } else {
   loc_val_meta <- get_localization_validation()
-  loc_val_nodes <- get_localization_validation_nodes()
    # Join beep data with validation metadata
   loc_val_data <- beep_data %>%
     filter(between(Time, min(loc_val_meta$ValStartDT), max(loc_val_meta$ValEndDT))) %>%
@@ -164,14 +165,44 @@ ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
 ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
-ggplot(all_converged_ests, aes(x = n_nodes, y = log(xy_dist))) +
-  geom_smooth(method = "lm") + 
-  geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
-  labs(x = "# detecting nodes", y = "log (absolute error) (m)", fill = "Within grid") + 
-  facet_wrap(~ grid_config) + 
+## First, fit a linear model evaluating the relationship and comparing among grid arrangments
+# We use the negative binomial model for overdispersion, and despite the absolute error being 
+# We exclude localizations outside the grid boundaries as they're less stable
+err_node_mod <- glmmTMB(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, 
+                    family = nbinom2(), data = filter(all_converged_ests, within_grid))
+# Check model fit; looks alright
+simulationOutput <- simulateResiduals(fittedModel = err_node_mod)
+plot(simulationOutput)
+# Check if interaction is supported? Nope
+summary(err_node_mod)
+# Refit without interaction
+err_node_mod <- glmmTMB(xy_dist ~ grid_config + n_nodes, 
+                        family = nbinom2(), data = filter(all_converged_ests, within_grid))
+summary(err_node_mod)
+# Little evidence of difference between full and reduced grid
+# Fit # node only model for plotting
+err_node_mod <- glmmTMB(xy_dist ~ n_nodes, 
+                        family = nbinom2(), data = filter(all_converged_ests, within_grid))
+new_dat <- data.frame(n_nodes = 3:16)
+preds <- predict(err_node_mod, newdata = new_dat, se.fit = TRUE)
+new_dat$fit_link <- preds$fit; new_dat$se_link <- preds$se.fit
+new_dat <- mutate(new_dat,
+                  fit = exp(fit_link),
+                  lcl = exp(fit_link - 2 * se_link),
+                  ucl = exp(fit_link + 2 * se_link))
+
+ggplot(all_converged_ests, aes(x = n_nodes)) +
+  geom_ribbon(data = new_dat, aes(ymin = lcl, ymax = ucl), alpha = 0.5) +
+  geom_line(data = new_dat, aes(y = fit)) + 
+  geom_point(aes(y = xy_dist, fill = grid_config), shape = 21, size = 3, alpha = 0.5) + 
+  labs(x = "# detecting nodes", y = "Absolute error (m)", fill = "Grid") + 
   ggtitle("Multilateration error vs. number of estimating nodes") +
-  theme_bw()
-ggsave("output/figures/absolute_estimation_error_by_number_detecting_nodes.png", width = 6.5, height = 4.5)
+  theme_bw() +
+  theme(legend.position = c(0.95, 0.95),
+        legend.justification = c(1, 1),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black"))
+ggsave("output/figures/absolute_estimation_error_by_number_detecting_nodes.png", width = 5, height = 5)
 
 # Relationship between distance from node grid center and absolute error of that estimate (localization)
 ggplot(all_converged_ests, aes(x = Val_dist_to_center, y = log(xy_dist))) +
