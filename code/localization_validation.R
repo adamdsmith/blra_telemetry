@@ -182,7 +182,7 @@ summary(nnode_mod) # Drop interaction, z = -1.44, p = 0.15
 # Refit without interaction
 nnode_mod <-glm.nb(xy_dist ~ grid_config + n_nodes, data = mod_dat)
 summary(nnode_mod) # Little evidence of difference between full and reduced grid (z = -1.16, p = 0.25)
-
+(1 - exp(coef(nnode_mod)[3])) # How much does each extra node reduce estimation error, on average
 # Fit # nodes only model for plotting
 nnode_mod <-glm.nb(xy_dist ~ n_nodes, data = mod_dat)
 new_dat <- data.frame(n_nodes = 3:16)
