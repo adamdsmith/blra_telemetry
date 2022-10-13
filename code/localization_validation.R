@@ -1,6 +1,6 @@
 # NOTE: Requires `code/localization_workflow` to have been run first 
 source("code/localization_workflow.R")
-pacman::p_load(glmmTMB, DHARMa)
+pacman::p_load(MASS, DHARMa)
 
 loc_val_path <- "data_derived/localization_validation.rds"
 loc_est_path <- "data_derived/localization_validation_estimates.rds"
@@ -166,25 +166,27 @@ ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
 ## First, fit a linear model evaluating the relationship and comparing among grid arrangments
-# We use the negative binomial model for overdispersion, and despite the absolute error being 
+# We use the negative binomial model for overdispersion; we rounded error estimates to nearest meter
 # We exclude localizations outside the grid boundaries as they're less stable
-err_node_mod <- glmmTMB(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, 
-                    family = nbinom2(), data = filter(all_converged_ests, within_grid))
-# Check model fit; looks alright
-simulationOutput <- simulateResiduals(fittedModel = err_node_mod)
-plot(simulationOutput)
+mod_dat <- mutate(all_converged_ests, xy_dist = round(xy_dist)) %>%
+  filter(within_grid)
+nnode_mod <- glm(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, family = poisson, data = mod_dat)
+sim_out <- simulateResiduals(nnode_mod)
+plot(sim_out) # Overdispersed related to Poisson; try NB
+
+nnode_mod <- glm.nb(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, data = mod_dat)
+sim_out <- simulateResiduals(nnode_mod)
+plot(sim_out) # Much better
 # Check if interaction is supported? Nope
-summary(err_node_mod)
+summary(nnode_mod) # Drop interaction, z = -1.44, p = 0.15
 # Refit without interaction
-err_node_mod <- glmmTMB(xy_dist ~ grid_config + n_nodes, 
-                        family = nbinom2(), data = filter(all_converged_ests, within_grid))
-summary(err_node_mod)
-# Little evidence of difference between full and reduced grid
-# Fit # node only model for plotting
-err_node_mod <- glmmTMB(xy_dist ~ n_nodes, 
-                        family = nbinom2(), data = filter(all_converged_ests, within_grid))
+nnode_mod <-glm.nb(xy_dist ~ grid_config + n_nodes, data = mod_dat)
+summary(nnode_mod) # Little evidence of difference between full and reduced grid (z = -1.16, p = 0.25)
+
+# Fit # nodes only model for plotting
+nnode_mod <-glm.nb(xy_dist ~ n_nodes, data = mod_dat)
 new_dat <- data.frame(n_nodes = 3:16)
-preds <- predict(err_node_mod, newdata = new_dat, se.fit = TRUE)
+preds <- predict(nnode_mod, newdata = new_dat, se.fit = TRUE)
 new_dat$fit_link <- preds$fit; new_dat$se_link <- preds$se.fit
 new_dat <- mutate(new_dat,
                   fit = exp(fit_link),
