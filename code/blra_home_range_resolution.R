@@ -146,3 +146,8 @@ akde_areas <- akde_areas %>%
 p + geom_text(data = akde_areas, aes(x, y, label = label),
               hjust = 0, vjust = 1, size = 3)
 ggsave("output/figures/akde_hr_resolution_comparisons.png", height = 6.5, width = 6.5)
+
+# Overlap of lower resolution home ranges vs. 15 min
+hr_overlap(blra_hr_15m$hr[[1]], blra_hr_1h$hr[[1]]) #15 min vs 1h
+hr_overlap(blra_hr_15m$hr[[1]], blra_hr_4h$hr[[1]]) #15 min vs 4h
+hr_overlap(blra_hr_15m$hr[[1]], blra_hr_8h$hr[[1]]) #15 min vs 8h
