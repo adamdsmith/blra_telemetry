@@ -1,3 +1,5 @@
+pacman::p_load(qpcR, nlraa)
+
 # Read in calibration setup metadata
 rssi_distance_path <- "data_derived/rssi_distance_calibration.rds"
 rssi_distance_sds_path <- "data_derived/rssi_distance_estimate_sds.rds"
@@ -100,13 +102,22 @@ if (!update_node_cal) {
   pred_dat$ExpDecay <- predict(exp_mod_mn, newdata = pred_dat)
   pred_dat <- pivot_longer(pred_dat,
                            cols = c("InvSqLaw", "ExpDecay"), 
-                           names_to = "model",
-                           values_to = "pred")
+                           names_to = "Model",
+                           values_to = "pred") %>%
+    mutate(Model = factor(Model, levels = c("InvSqLaw", "ExpDecay"),
+                          labels = c("Inverse Square Law", "Exponential Decay")))
 
   ggplot(data = rssi_cal_beeps_mn, aes(Dist_node, adjTagRSSI_mn)) + 
-    geom_line(data = pred_dat, aes(y = pred, color = model), lwd = 2) +
+    geom_line(data = pred_dat, aes(y = pred, color = Model), lwd = 2) +
     geom_point() +
-    theme_bw()
+    labs(x = "Distance (m) from node", y = "Calibration-adjusted RSS (2 min mean)") +
+    theme_bw() +
+    theme(legend.position = c(0.95, 0.95),
+          legend.justification = c(1, 1),
+          legend.background = element_blank(),
+          legend.box.background = element_rect(colour = "black"))
+  ggsave("output/figures/RSSI_distance_model_comparison.png", width = 5, height = 5)
+  
 
   pred_dist <- function(merMod, rssi = -90:-25) {
     calc_D <- function(RSSI, RSSI0, K) 10^((RSSI0 - RSSI)/K)
@@ -127,7 +138,10 @@ if (!update_node_cal) {
     mutate(rssi = -90:-25) %>%
     pivot_longer(-rssi, names_to = "sim", values_to = "dist")
   ggplot(boot_mn, aes(rssi, dist)) +
-    geom_line(aes(group = sim), alpha = 0.1, lwd=2)
+    geom_line(aes(group = sim), alpha = 0.1, lwd=2) +
+    labs(x = "Calibration-adjusted RSS (2 min mean)", y = "Estimated distance (m)") +
+    theme_bw()
+  ggsave("output/figures/RSSI_distance_model_uncertainty.png", width = 5, height = 4)
   
   rssi_dist_sum <- group_by(boot_mn, rssi) %>%
     summarize(mean = mean(dist),
@@ -136,13 +150,14 @@ if (!update_node_cal) {
   with(rssi_dist_sum, plot(rssi, 1 / sd))
   
   # RMSE comparisons out of curiosity (packages not loaded by default)
-  # phys_mod_rmse <- bootMer(rssi_dist_m_mn, qpcR::RMSE, nsim = 500)$t
-  # exp_mod_rmse <- nlraa::boot_nls(exp_mod_mn, f = qpcR::RMSE, R = 500)$t
-  # rmse_comparison <- data.frame(model = rep(c("Physical", "Exp. decay"), each = 500),
-  #                               RMSE = c(phys_mod_rmse, exp_mod_rmse))
-  # ggplot(rmse_comparison, aes(x = model, y = RMSE)) + geom_violin() +
-  #   theme_bw()
-  # 
+  phys_mod_rmse <- bootMer(rssi_dist_m_mn, qpcR::RMSE, nsim = 500)$t
+  exp_mod_rmse <- nlraa::boot_nls(exp_mod_mn, f = qpcR::RMSE, R = 500)$t
+  rmse_comparison <- data.frame(Model = rep( c("Inverse Square Law", "Exponential Decay"), each = 500),
+                                RMSE = c(phys_mod_rmse, exp_mod_rmse))
+  ggplot(rmse_comparison, aes(x = Model, y = RMSE)) + geom_violin(fill = "gray75") +
+    theme_bw()
+  ggsave("output/figures/RSSI_distance_models_RMSE_comparison.png", width = 5, height = 4)
+  
   saveRDS(rssi_dist_m_mn, rssi_distance_path)
   
   # Save lookup table of distance estimate uncertainty by RSSI value
