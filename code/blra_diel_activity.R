@@ -18,20 +18,34 @@ sun <- nrsmisc::get_sun(-80.90303, 28.55893, start = as_date("2022-03-30"),
 
 blra_act <- left_join(blra_act, sun, by = "date_str") %>%
   mutate(daytime = DetTimeR >= dawn & DetTimeR <= dusk,
-         DetTimeQtr = hms::as_hms(floor_date(DetTimeR, "30 mins")))
+         DetTimeHalf = hms::as_hms(floor_date(DetTimeR, "30 mins")))
 
 ggplot(blra_act, aes(DetTimeR, RSSI_sd_wt)) + 
   geom_point(aes(fill = daytime), shape = 21) +
   scale_fill_manual(values = c("black", "white")) +
   scale_x_datetime("Time (America/New York)",
                    date_breaks = "4 hour", date_labels = "%R") +
-  labs(y = "Weighted SD of RSSI among detecting nodes") +
+  labs(y = "Weighted average SD of RSSI among detecting nodes") +
   facet_wrap(~ date_str, scales = "free_x", ncol = 2) + 
-  theme_bw()
+  theme_bw() +
+  theme(legend.position = "none")
 ggsave("output/figures/diel_activity.png", height = 9, width = 6.5)
 
-ggplot(blra_act, aes(DetTimeQtr, RSSI_sd_wt, group=DetTimeQtr)) + geom_boxplot() +
-  labs(y = "Weighted SD of RSSI among detecting nodes") +
-  theme_bw() + scale_x_time("Time (America/New York)", 
-                            breaks = scales::breaks_width("4 hour"))
+# Convert dawn/dusk for background plotting
+sun_half <- mutate(sun, 
+                   dawnHalf = hms::as_hms(dawn),
+                   duskHalf = hms::as_hms(dusk))
+                   
+
+ggplot(blra_act) +
+  geom_rect(data = sun_half, aes(xmin = -Inf, xmax = dawnHalf), 
+            ymin = -Inf, ymax = Inf, color = "gray", alpha = 1/28) +
+  geom_rect(data = sun_half, aes(xmin = duskHalf, xmax = Inf), 
+            ymin = -Inf, ymax = Inf, color = "gray", alpha = 1/28) +
+  geom_boxplot(aes(DetTimeHalf, RSSI_sd_wt, group=DetTimeHalf)) +
+  labs(y = "Weighted average SD of RSSI among detecting nodes") +
+  theme_bw() + 
+  scale_x_time("Time (America/New York)", 
+                            breaks = scales::breaks_width("4 hour"),
+               expand = expansion(mult = 1/96))
 ggsave("output/figures/diel_activity_30min.png", height = 6.5, width = 9)
