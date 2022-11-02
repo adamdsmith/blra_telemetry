@@ -166,25 +166,21 @@ ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
 ## First, fit a linear model evaluating the relationship and comparing among grid arrangments
-# We use the negative binomial model for overdispersion; we rounded error estimates to nearest meter
+# We use the Gamma model for continuous but non-negative error estimates
 # We exclude localizations outside the grid boundaries as they're less stable
-mod_dat <- mutate(all_converged_ests, xy_dist = round(xy_dist)) %>%
-  filter(within_grid)
-nnode_mod <- glm(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, family = poisson, data = mod_dat)
+mod_dat <- all_converged_ests %>% filter(within_grid)
+nnode_mod <- glm(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, family = Gamma(link = "log"), data = mod_dat)
 sim_out <- simulateResiduals(nnode_mod)
-plot(sim_out) # Overdispersed related to Poisson; try NB
+plot(sim_out) # Not amazing but adequate
+summary(nnode_mod) # Drop interaction, t40 = -1.35, p = 0.18
 
-nnode_mod <- glm.nb(xy_dist ~ grid_config + n_nodes + grid_config * n_nodes, data = mod_dat)
-sim_out <- simulateResiduals(nnode_mod)
-plot(sim_out) # Much better
-# Check if interaction is supported? Nope
-summary(nnode_mod) # Drop interaction, z = -1.44, p = 0.15
 # Refit without interaction
-nnode_mod <-glm.nb(xy_dist ~ grid_config + n_nodes, data = mod_dat)
-summary(nnode_mod) # Little evidence of difference between full and reduced grid (z = -1.16, p = 0.25)
+nnode_mod <-glm(xy_dist ~ grid_config + n_nodes, family = Gamma(link = "log"), data = mod_dat)
+summary(nnode_mod) # Little evidence of difference between full and reduced grid (t41 = -0.99, p = 0.33)
 (1 - exp(coef(nnode_mod)[3])) # How much does each extra node reduce estimation error, on average
+
 # Fit # nodes only model for plotting
-nnode_mod <-glm.nb(xy_dist ~ n_nodes, data = mod_dat)
+nnode_mod <- glm(xy_dist ~ n_nodes, family = Gamma(link = "log"), data = mod_dat)
 new_dat <- data.frame(n_nodes = 3:16)
 preds <- predict(nnode_mod, newdata = new_dat, se.fit = TRUE)
 new_dat$fit_link <- preds$fit; new_dat$se_link <- preds$se.fit
