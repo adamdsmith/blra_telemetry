@@ -20,7 +20,7 @@ if (!update_node_cal) {
   rssi_cal_beep_data <- beep_data %>%
     filter(!is.na(NodeId),
            NodeId %in% rssi_cal_nodes) %>%
-    select(DetTime = Time, RadioId:NodeId)
+    dplyr::select(DetTime = Time, RadioId:NodeId)
   
   # Join beep data with calibration metadata
   rssi_cal_beeps <- left_join(rssi_distance_data, rssi_cal_beep_data, by = c("NodeId", "TagId")) %>%
@@ -43,7 +43,7 @@ if (!update_node_cal) {
            # Correct TagRSSI based on node and tag calibrations
            adjTagRSSI = TagRSSI + node_rssi_gam_adj - tag_rssi_gam_adj,
            logDist = log10(Dist_node + 1)) %>%
-    select(Trial:CalEndDT, logDist, TagRSSI, adjTagRSSI)
+    dplyr::select(Trial:CalEndDT, logDist, TagRSSI, adjTagRSSI)
 
   ggplot(rssi_cal_beeps_i, aes(-logDist, adjTagRSSI, color = Trial)) + 
     geom_point(alpha = 0.5) + geom_smooth(method = "lm") +
@@ -83,6 +83,9 @@ if (!update_node_cal) {
   # Second, based on 2-minute mean signal strength
   rssi_dist_m_mn <- lmer(adjTagRSSI_mn ~ 1 + logDist + (1 | Trial), data = rssi_cal_beeps_mn)
   
+  # Add residuals
+  rssi_cal_beeps_mn$isl_resid <- resid(rssi_dist_m_mn)
+  
   # Compare with exponential model of Paxton et al. 2022
   exp_mod_mn <- nls(adjTagRSSI_mn ~ SSasymp(Dist_node, Asym, R0, lrc), data = rssi_cal_beeps_mn)
   exp_mod_coef <- coef(exp_mod_mn)
@@ -93,6 +96,8 @@ if (!update_node_cal) {
   exp_mod_mn <- nls(adjTagRSSI_mn ~ a * exp(-S * Dist_node) + K, 
                       start = list(a = a, S = S, K = K), 
                       data = rssi_cal_beeps_mn)
+  # Add residuals
+  rssi_cal_beeps_mn$ed_resid <- resid(exp_mod_mn)
   
   # Compare our physical model (inverse squared distance) vs.
   # Paxton et al. exponential decay model
@@ -118,7 +123,17 @@ if (!update_node_cal) {
           legend.box.background = element_rect(colour = "black"))
   ggsave("output/figures/RSSI_distance_model_comparison.png", width = 5, height = 5)
   
-
+  resid_dat <- dplyr::select(rssi_cal_beeps_mn, Dist_node, isl_resid, ed_resid) %>%
+    pivot_longer(!Dist_node, names_to = "Model", values_to = "resid") %>%
+    mutate(Model = factor(Model, levels = c("isl_resid", "ed_resid"),
+                          labels = c("Inverse Square Law", "Exponential Decay")))
+  ggplot(data = resid_dat, aes(Dist_node, resid)) + 
+    geom_hline(yintercept = 0, lty = "dashed") +
+    geom_point(aes(color = Model)) +
+    labs(x = "Distance (m) from node", y = "Residual RSS") +
+    theme_bw() 
+  ggsave("output/figures/RSSI_distance_model_residual_comparison.png", width = 6.5, height = 4)
+  
   pred_dist <- function(merMod, rssi = -100:-25) {
     calc_D <- function(RSSI, RSSI0, K) 10^((RSSI0 - RSSI)/K)
     coefs <- unname(fixef(merMod))
