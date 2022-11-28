@@ -119,7 +119,7 @@ if (!update_node_cal) {
   ggsave("output/figures/RSSI_distance_model_comparison.png", width = 5, height = 5)
   
 
-  pred_dist <- function(merMod, rssi = -90:-25) {
+  pred_dist <- function(merMod, rssi = -100:-25) {
     calc_D <- function(RSSI, RSSI0, K) 10^((RSSI0 - RSSI)/K)
     coefs <- unname(fixef(merMod))
     k <- coefs[2] / -1; rssi0 <- coefs[1]
@@ -129,25 +129,37 @@ if (!update_node_cal) {
   
   boot_i <- t(bootMer(rssi_dist_m_i, pred_dist, 100)$t) %>%
     as.data.frame() %>%
-    mutate(rssi = -90:-25) %>%
+    mutate(rssi = -100:-25) %>%
     pivot_longer(-rssi, names_to = "sim", values_to = "dist")
   ggplot(boot_i, aes(rssi, dist, group = sim)) + geom_line(alpha = 0.1, lwd=2)
   
   boot_mn <- t(bootMer(rssi_dist_m_mn, pred_dist, 100)$t) %>%
     as.data.frame() %>%
-    mutate(rssi = -90:-25) %>%
+    mutate(rssi = -100:-25) %>%
     pivot_longer(-rssi, names_to = "sim", values_to = "dist")
+  
+  # Not run here, but rerun boot_mn with 1000 iterations and
+  # calculate 95% confidence interval for predicted distance at RSS = -90
+  # ci <- filter(boot_mn, rssi == -90)
+  # quantile(ci$dist, probs = c(0.025, 0.975))
+  
   ggplot(boot_mn, aes(rssi, dist)) +
     geom_line(aes(group = sim), alpha = 0.1, lwd=2) +
     labs(x = "Calibration-adjusted RSS (2 min mean)", y = "Estimated distance (m)") +
     theme_bw()
   ggsave("output/figures/RSSI_distance_model_uncertainty.png", width = 5, height = 4)
   
-  rssi_dist_sum <- group_by(boot_mn, rssi) %>%
-    summarize(mean = mean(dist),
-              sd = sd(dist))
-  with(rssi_dist_sum, plot(rssi, sd))
-  with(rssi_dist_sum, plot(rssi, 1 / sd))
+  # Illustrate how predicted distance varies with RSSI
+  boot_mn_sum <- boot_mn %>% group_by(rssi) %>%
+    summarize(dist_mn = mean(dist),
+              dist_sd = sd(dist),
+              dist_cv = dist_sd / dist_mn)
+  ggplot(boot_mn_sum, aes(rssi, dist_sd)) +
+    geom_line() +
+    labs(x = "Calibration-adjusted RSS (2 min mean)", 
+         y = "Standard deviation of estimated distance (m)") +
+    theme_bw()
+  ggsave("output/figures/RSSI_distance_model_Sd_vs_RSS.png", width = 5, height = 4)
   
   # RMSE comparisons out of curiosity (packages not loaded by default)
   phys_mod_rmse <- bootMer(rssi_dist_m_mn, qpcR::RMSE, nsim = 500)$t
