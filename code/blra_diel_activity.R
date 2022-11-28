@@ -18,7 +18,10 @@ sun <- nrsmisc::get_sun(-80.90303, 28.55893, start = as_date("2022-03-30"),
 
 blra_act <- left_join(blra_act, sun, by = "date_str") %>%
   mutate(daytime = DetTimeR >= dawn & DetTimeR <= dusk,
-         DetTimeHalf = hms::as_hms(floor_date(DetTimeR, "30 mins")))
+         DetTimeHalf = hms::as_hms(floor_date(DetTimeR, "30 mins"))) %>%
+  # Add row to fix x axis on last panel
+  add_row(DetTimeR = ymd_hms("2022-04-13 23:57:00", tz = "America/New_York"),
+          date_str = "2022-04-13")
 
 ggplot(blra_act, aes(DetTimeR, RSSI_sd_wt)) + 
   geom_point(aes(fill = daytime), shape = 21) +
