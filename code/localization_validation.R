@@ -1,6 +1,6 @@
 # NOTE: Requires `code/localization_workflow` to have been run first 
 source("code/localization_workflow.R")
-pacman::p_load(MASS, DHARMa)
+pacman::p_load(MASS, DHARMa, patchwork)
 
 loc_val_path <- "data_derived/localization_validation.rds"
 loc_est_path <- "data_derived/localization_validation_estimates.rds"
@@ -17,7 +17,7 @@ if (!new_beep_data) {
   loc_val_data <- beep_data %>%
     filter(between(Time, min(loc_val_meta$ValStartDT), max(loc_val_meta$ValEndDT))) %>%
     # Get rid of duplicate detections on multiple SS radios
-    select(DetTime = Time, TagId:NodeId) %>% distinct() %>%
+    dplyr::select(DetTime = Time, TagId:NodeId) %>% distinct() %>%
     right_join(loc_val_meta, by = "TagId") %>%
     filter(between(DetTime, ValStartDT, ValEndDT)) %>%
     # Add calibration information
@@ -37,7 +37,7 @@ if (!new_beep_data) {
     filter(adjTagRSSI_mn >= -90) %>%
     # Join with estimated distance from RSSI vs distance model
     left_join(pred_dist_sd, by = "join_rssi") %>%
-    select(-join_rssi)   %>%
+    dplyr::select(-join_rssi)   %>%
     left_join(loc_val_nodes, by = "NodeId")
   
   saveRDS(loc_val_data, loc_val_path)
@@ -141,28 +141,29 @@ all_converged_ests <- filter(out_loc_ests, converged)
             med_xy_dist_naive = median(xy_dist_naive)))
 
 # Histograms of absolute error for estimated location of validation points (w/median absolute error)
-ggplot(all_converged_ests, aes(x = xy_dist)) +
+p1 <- ggplot(all_converged_ests, aes(x = xy_dist)) +
   geom_histogram(binwidth = 2, colour="black", fill="gray") +
   geom_vline(data = est_medians, aes(xintercept = med_xy_dist), color = "red", linetype = "dashed", size = 1) + 
   scale_x_continuous("Absolute error (m)", limits = c(0, 100)) +
   geom_text(data = est_medians, aes(label = paste("Median:", round(med_xy_dist, 1), "m")), 
             x = 100, y = 4, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
-  ggtitle("Multilateration error of validation locations") +
+  ggtitle("Multilateration error") +
   theme_bw()
-ggsave("output/figures/absolute_estimation_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Histograms of absolute error for naive location (i.e., location of node w/strongest RSSI) of validation points (w/median absolute error)
-ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
+p2 <- ggplot(out_loc_ests, aes(x = xy_dist_naive)) +
   geom_histogram(binwidth = 2, colour="black", fill="gray") +
   geom_vline(data = est_medians, aes(xintercept = med_xy_dist_naive), color = "red", linetype = "dashed", size = 1) + 
   scale_x_continuous("Absolute error (m)", limits = c(0, 100)) +
   geom_text(data = est_medians, aes(label = paste("Median:", round(med_xy_dist_naive, 1), "m")), 
             x = 100, y = 5, vjust = 1, hjust = 1) +
   labs(y = "# validation points") + facet_wrap(~grid_config, ncol = 1) +
-  ggtitle("Naive error of validation locations") +
+  ggtitle("Naive error") +
   theme_bw()
-ggsave("output/figures/absolute_naive_error_by_grid_configuration.png", width = 6.5, height = 4.5)
+
+p1 + p2 + plot_annotation(tag_levels = 'A')
+ggsave("output/figures/localization_and_naive_error_by_grid_configuration.png", width = 6.5, height = 4.5)
 
 # Relationship between number of nodes used in location estimation and absolute error of that estimate
 ## First, fit a linear model evaluating the relationship and comparing among grid arrangments
@@ -203,24 +204,32 @@ ggplot(all_converged_ests, aes(x = n_nodes)) +
 ggsave("output/figures/absolute_estimation_error_by_number_detecting_nodes.png", width = 5, height = 5)
 
 # Relationship between distance from node grid center and absolute error of that estimate (localization)
-ggplot(all_converged_ests, aes(x = Val_dist_to_center, y = log(xy_dist))) +
+p1 <- ggplot(all_converged_ests, aes(x = Val_dist_to_center, y = xy_dist)) +
   geom_smooth(method = "lm") + 
   geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
-  labs(x = "Distance to node grid center (m)", y = "log (Absolute error) (m)", color = "Point\nin grid") + 
+  labs(x = "Distance to node grid center (m)", y = "Absolute error (m)", color = "Point\nin grid") + 
   facet_wrap(~ grid_config, ncol = 2) + 
-  ggtitle("Multilateration error vs. distance from center of node grid") +
-  theme_bw()
-ggsave("output/figures/multilateration_estimation_error_by_distance_to_grid_center.png", width = 6.5, height = 4.5)
+  ggtitle("Multilateration error") +
+  scale_y_continuous(trans = "log", breaks = c(1, seq(5, 85, by = 10)), limits = c(1, 85)) +
+  theme_bw() +
+  theme(legend.position = c(0.025, 0.975),
+        legend.justification = c(0, 1),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black"))
 
 # Relationship between distance from node grid center and absolute error of that estimate (naive)
-ggplot(out_loc_ests, aes(x = Val_dist_to_center, y = log(xy_dist_naive))) +
+p2 <- ggplot(out_loc_ests, aes(x = Val_dist_to_center, y = xy_dist_naive)) +
   geom_smooth(method = "lm") + 
   geom_point(aes(fill = within_grid), shape = 21, size = 3, alpha = 0.5) + 
-  labs(x = "Distance to node grid center (m)", y = "log (absolute error) (m)", color = "Point\nin grid") + 
+  labs(x = "Distance to node grid center (m)", y = NULL, color = "Point\nin grid") + 
   facet_wrap(~ grid_config, ncol = 2) + 
-  ggtitle("Naive error vs. distance from center of node grid") +
-  theme_bw()
-ggsave("output/figures/naive_estimation_error_by_distance_to_grid_center.png", width = 6.5, height = 4.5)
+  ggtitle("Naive error") +
+  scale_y_continuous(trans = "log", breaks = c(1, seq(5, 85, by = 10)), limits = c(1, 85)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.text.y = element_blank())
+p1 + p2 + plot_annotation(tag_levels = 'A')
+ggsave("output/figures/multilateration_vs_naive_estimation_error_by_distance_to_grid_center.png", width = 10, height = 6.5)
 
 # Estimated absolute errors plotted by location within node grid
 ## Need to first expand node location data.frame for use in faceted plot
@@ -229,27 +238,41 @@ exp_node_locs <- bind_rows(
   mutate(filter(loc_val_nodes, reduced_grid), grid_config = "reduced")
 )
 
-## Then plot
-ggplot(all_converged_ests, aes(Val_X, Val_Y)) + 
-  geom_point(aes(color = xy_dist, size = n_nodes)) + 
-  geom_point(data = exp_node_locs, aes(X, Y)) +
-  scale_color_gradient(low = "#1a9641", high = "#d7191c") +
-  labs(x = NULL, y = NULL, size = "# nodes", color = "Absolute\nerror (m)") +
-  facet_wrap(~grid_config) +
+## Then plot (here we use only the full grid)
+p1 <- ggplot(filter(all_converged_ests, grid_config == "full"), aes(Val_X, Val_Y)) + 
+  geom_point(aes(color = xy_dist, size = xy_dist)) + 
+  geom_point(data = filter(exp_node_locs, grid_config == "full"), aes(X, Y), 
+             shape = 21, fill = "white") +
+  scale_color_gradient(low = "#1a9641", high = "#d7191c",
+                       breaks = seq(0, 80, by = 10), limits = c(0, 80)) +
+  scale_size_continuous(breaks = seq(0, 80, by = 10), limits = c(0, 80)) +
+  scale_x_continuous(limits = range(exp_node_locs$X) + c(-25, 25)) +
+  scale_y_continuous(limits = range(exp_node_locs$Y) + c(-25, 15)) +
+  guides(color=guide_legend(), size = guide_legend()) +
+  labs(x = NULL, y = NULL, size = "Absolute\nerror (m)", color = "Absolute\nerror (m)") +
+  # facet_wrap(~grid_config) +
   theme_bw() +
-  theme(axis.text = element_blank())
-ggsave("output/figures/absolute_estimation_error_by_location_in_grid.png", width = 6.5, height = 4.5)
+  theme(axis.text = element_blank(),
+        legend.position = "none")
 
 # Absolute error of naive estimates (i.e., node w/strongest RSSI) by location in grid
-ggplot(out_loc_ests, aes(Val_X, Val_Y)) + 
-  geom_point(aes(color = xy_dist_naive), size = 4) + 
-  geom_point(data = exp_node_locs, aes(X, Y)) +
-  scale_color_gradient(low = "#1a9641", high = "#d7191c") +
-  labs(x = NULL, y = NULL, color = "Absolute\nerror (m)") +
-  facet_wrap(~grid_config) +
+p2 <- ggplot(filter(out_loc_ests, grid_config == "full"), aes(Val_X, Val_Y)) + 
+  geom_point(aes(color = xy_dist_naive, size = xy_dist_naive)) + 
+  geom_point(data = filter(exp_node_locs, grid_config == "full"), aes(X, Y), 
+             shape = 21, fill = "white") +
+  scale_color_gradient(low = "#1a9641", high = "#d7191c",
+                       breaks = seq(0, 80, by = 10), limits = c(0, 80)) +
+  scale_size_continuous(breaks = seq(0, 80, by = 10), limits = c(0, 80)) +
+  scale_x_continuous(limits = range(exp_node_locs$X) + c(-25, 25)) +
+  scale_y_continuous(limits = range(exp_node_locs$Y) + c(-25, 15)) +
+  guides(color=guide_legend(), size = guide_legend()) +
+  labs(x = NULL, y = NULL, size = "Absolute\nerror (m)", color = "Absolute\nerror (m)") +
+  # facet_wrap(~grid_config) +
   theme_bw() +
   theme(axis.text = element_blank())
-ggsave("output/figures/absolute_naive_error_by_location_in_grid.png", width = 6.5, height = 4.5)
+
+p1 + p2 + plot_annotation(tag_levels = 'A')
+ggsave("output/figures/localization_and_naive_error_by_location_in_grid.png", width = 6.5, height = 4)
 
 # Relationship between localization standard deviation and absolute error of estimated location
 # NOTE: This was just out of curiosity; doubt we use
