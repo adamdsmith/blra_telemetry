@@ -94,7 +94,12 @@ if (!update_node_cal) {
   
   tag_corrections <- tibble(TagId = levels(tag_cal_beeps$TagId),
                             tag_rssi_gam_adj = unname(coef(tag_cal_gam)[tag_coefs]))
-  
+  mean(tag_corrections$tag_rssi_gam_adj); sd(tag_corrections$tag_rssi_gam_adj)
+
+  ggplot(tag_corrections, aes(tag_rssi_gam_adj)) +
+    geom_histogram(binwidth = 1, color = "black", fill = "gray50") +
+    labs(x = "RSS correction", y = NULL) + theme_bw()
+  ggsave("output/figures/tag-specific_correction_histogram.png", width = 4.5, height = 4.5)
   message("Saving tag calibration corrections to '", tag_correction_path, ".'")
   saveRDS(tag_corrections, file = tag_correction_path)
 }
