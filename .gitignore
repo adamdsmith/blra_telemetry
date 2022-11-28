@@ -7,6 +7,18 @@ data_raw/GA Black Rail/
 data_raw/CTT_powertag_test.xlsx
 data_raw/caught.RData
 output/TagRSSI_distance_CV.rds
+data_derived/beep_data.rds
+data_derived/blra_hr_15m_estimates.rds
+data_derived/blra_hr_1h_estimates.rds
+data_derived/blra_hr_4h_estimates.rds
+data_derived/blra_hr_8h_estimates.rds
+data_derived/blra_hr_loc_full_estimates.rds
+data_derived/blra_hr_loc_reduced_estimates.rds
+data_derived/blra_hr_naive_full_estimates.rds
+data_derived/blra_hr_naive_reduced_estimates.rds
+data_derived/blra_locs_reduced.rds
+data_derived/localized_beep_data.rds
+data_derived/processed_beep_data.rds
 
 # Session Data files
 .RData
