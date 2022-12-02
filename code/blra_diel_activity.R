@@ -1,6 +1,6 @@
 # Diel activity
 blra_id <- "78076161"
-blra_act <- read_rds("data_derived/localized_beep_data.rds")[[blra_id]]
+blra_act <- readRDS("data_derived/localized_beep_data.rds")[[blra_id]]
 attr(blra_act$DetTimeR, "tzone") <- "America/New_York"
 blra_act <- blra_act %>% 
   # Use data from end of March into April with complete node grid while bird was alive
@@ -28,7 +28,7 @@ ggplot(blra_act, aes(DetTimeR, RSSI_sd_wt)) +
   scale_fill_manual(values = c("black", "white")) +
   scale_x_datetime("Time (America/New York)",
                    date_breaks = "4 hour", date_labels = "%R") +
-  labs(y = "Weighted average SD of RSSI among detecting nodes") +
+  labs(y = "Weighted average SD of RSS among detecting nodes") +
   facet_wrap(~ date_str, scales = "free_x", ncol = 2) + 
   theme_bw() +
   theme(legend.position = "none")
@@ -46,7 +46,7 @@ ggplot(blra_act) +
   geom_rect(data = sun_half, aes(xmin = duskHalf, xmax = Inf), 
             ymin = -Inf, ymax = Inf, color = "gray", alpha = 1/28) +
   geom_boxplot(aes(DetTimeHalf, RSSI_sd_wt, group=DetTimeHalf)) +
-  labs(y = "Weighted average SD of RSSI among detecting nodes") +
+  labs(y = "Weighted average SD of RSS among detecting nodes") +
   theme_bw() + 
   scale_x_time("Time (America/New York)", 
                             breaks = scales::breaks_width("4 hour"),
